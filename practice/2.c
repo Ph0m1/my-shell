@@ -23,8 +23,6 @@ void mycd(char *argv[])
         char*home=getenv("HOME");
         chdir("/home");   
         // sleep(4);
-        
-        
     }
     else if (strcmp(argv[1],"-") == 0)
     {
