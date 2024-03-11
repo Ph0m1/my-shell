@@ -21,8 +21,8 @@ void mycd(char *argv[])
     if (strcmp(argv[1],"~") == 0)
     {
         char*home=getenv("HOME");
-        chdir("/home");   
-        // sleep(4);
+        chdir(home);
+        free(home);   
     }
     else if (strcmp(argv[1],"-") == 0)
     {
@@ -36,5 +36,4 @@ void mycd(char *argv[])
     path=getcwd(NULL,0);
     puts(path);
     free(path);
-    // sleep(4);
 }

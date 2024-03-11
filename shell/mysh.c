@@ -1,13 +1,20 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <signal.h>
+#include <stdlib.h>
+#include <time.h>
+#include <pwd.h>
+#include <sys/types.h>
 
 #define Max 2048
-#define BULE
-#define YELLOW
-#define GREEN
-#define RED
-#define NONE
+#define BLUE "\033[0;32;34m"
+#define BLUE2 "\033[;32;34m"
+#define YELLOW "\33[0;32;33m"
+#define GREEN "\033[0;32;32m"
+#define GREEN2 "\033[0;35;32m"
+#define RED "\033[1;32;31m"
+#define NONE "\033[0m"
 
 // 获取用户组信息
 void getid();
@@ -26,33 +33,62 @@ void mydup3();
 
 int main(int argc, char *argv[])
 {
-    getit();
+    // getit();
 
-    while (1)
+    // while (1)
     {
-        colorfulprint();
-        if(argv[0] == "cd") mtcd(argv);
+        getid();
+        if(argv[0] == "cd") mycd(argv);
     }
 }
 
-char path[Max];
-
-void mycd(char *argv[])
+char *formatPath;
+void mycd(char *arg[])
 {
-    if(argv[0] != "cd")
-        return;
-    char *currentPath = getcwd(NULL,0);
-    if(argv[1] == "~")
+    char *path;
+    path = getcwd(NULL, 0);
+    if (strcmp(arg[1],"~") == 0)
     {
         char*home=getenv("HOME");
-        chdir("/home");
+        chdir(home);
+        free(home);
     }
-    if(argv[1] == "-")
+    else if (strcmp(arg[1],"-") == 0)
     {
+        puts(formatPath);
+        chdir(formatPath);
+    }
+    else
+    {
+        chdir(arg[1]);
+    }
+    path=getcwd(NULL,0);
+    formatPath = path;
+    free(path);
+}
 
+void getid()
+{
+    //获取当前用户
+    uid_t uid;
+    uid = getuid();
+    struct passwd *pwd;
+    pwd = getpwuid(uid);
+    
+    //获取主机名
+    char hostname[Max+1];
+    if(gethostname(&hostname[0],Max)==-1)
+    {
+        perror("gethostname");
+        exit;
     }
-    if(chdir(argv[1]) == -1){
-        printf("Cannot move to %s", argv[1]);
-    }
-    memcpy(path,currentPath);
+    
+    //获取当前所在目录
+    char * path = getcwd(NULL,0);
+    time_t t;
+    time(&t);
+    struct tm *tm;
+    tm = localtime(&t);
+    printf(BLUE "# "BLUE2"%s"NONE " @ " GREEN"%s"NONE" in "YELLOW"%s"NONE" [%d:%d:%d]\n",pwd->pw_name,hostname,path,tm->tm_hour,tm->tm_min,tm->tm_sec);
+    printf(RED"$ "NONE);
 }
