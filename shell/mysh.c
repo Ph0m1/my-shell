@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <fcntl.h>
 #include <wait.h>
+#include <ctype.h>
 
 #define Max 2048
 #define BLUE "\033[1;32;34m"
@@ -39,13 +40,20 @@ void exec(char *arg[]);
 int readltok(char *stdinn, char *argv[]);
 void truedir(char *path);
 
+void prosses(char *command);
+char *trim(char *str);
+char *rtrim(char *str);
+char *ltrim(char *str);
 int main(int argc, char *argv[])
 {
     getit();
     char *readlineonscreen = (char *)malloc(sizeof(char) * Max);
     char *stdinn = NULL;
+
     while (1)
     {
+        fflush(stdout);
+        fflush(stdin);
         printf("\n");
         getid(readlineonscreen);
         char *arg[Max] = {NULL};
@@ -53,42 +61,32 @@ int main(int argc, char *argv[])
         add_history(stdinn);
         if (stdinn == "\n" || stdinn == NULL)
             continue;
-        char *command = NULL;
+        if (strcmp(stdinn, "exit") == 0)
+        {
+            break;
+        }
+        char *command;
+
         int cnt = 0;
-        strcpy(command,stdinn);
-        if(strstr(command, "|")){
+        command = strdup(stdinn);
 
-        }
-        else if(strstr(command,"<")){
-
-        }
-        else if(strstr(command,">>"))
-        {
-
-        }
-        else if(strstr(command,">"))
-        {
-            
-        }
-        
-        int cincount = readltok(stdinn, arg);
+        arg[0] = strtok(stdinn, " ");
         if (arg[0] == NULL)
             continue;
         if (strcmp(arg[0], "cd") == 0 || strcmp(arg[0], "chdir") == 0)
             mycd(arg);
         else
-            exec(arg);
-
+            prosses(command);
+        free(stdinn);
+        free(command);
         fflush(stdout);
     }
     free(stdinn);
     free(readlineonscreen);
-    free(formatPath);
 }
 
 void mycd(char *arg[])
 {
-
     char *path;
     path = getcwd(NULL, 0);
     if (strcmp(arg[1], "~") == 0)
@@ -110,7 +108,8 @@ void mycd(char *arg[])
     {
         chdir(arg[1]);
     }
-    formatPath = path;
+    formatPath = strdup(path);
+    free(path);
 }
 
 void getid(char *str)
@@ -139,7 +138,7 @@ void getid(char *str)
     time(&t);
     struct tm *tm;
     tm = localtime(&t);
-    sprintf(str, "\001" BLUE "# " BLUE2 "%s" NONE " @ " GREEN "%s" NONE " in " YELLOW "%s" NONE " [%d:%d:%d]\n\001%s", pwd->pw_name, hostname, path, tm->tm_hour, tm->tm_min, tm->tm_sec, uid == 1 ? RED "# " NONE : RED "$ " NONE"\002");
+    sprintf(str, "\001" BLUE "# " BLUE2 "%s" NONE " @ " GREEN "%s" NONE " in " YELLOW "%s" NONE " [%d:%d:%d]\n\001%s\002", pwd->pw_name, hostname, path, tm->tm_hour, tm->tm_min, tm->tm_sec, uid == 1 ? RED "# " NONE : RED "$ " NONE "\002");
     free(path);
     fflush(stdout);
 }
@@ -153,6 +152,7 @@ int readltok(char *stdinn, char *argv[])
 
     while (tok != NULL && i < Max)
     {
+        // strcpy(argv[i],tok);
         argv[i] = strdup(tok);
         tok = strtok(NULL, " \n");
         i++;
@@ -180,13 +180,6 @@ void getit()
     signal(SIGHUP, SIG_IGN);
 }
 
-
-void mydup()
-{
-    int fd1;
-    int fd2;
-}
-
 void exec(char *arg[])
 {
     int pd = fork();
@@ -198,7 +191,177 @@ void exec(char *arg[])
             exit(1);
         }
     }
+    else if (pd < 0)
+    {
+        perror("fork failed");
+        exit(1);
+    }
     else
-        wait(NULL);
+        wait(&pd);
     return;
+}
+
+void prosses(char *command)
+{
+    char *token;
+    char *saveptr;
+    char *commands[Max];
+    int i = 0;
+
+    token = strtok_r(command, "|", &saveptr);
+    while (token != NULL && i < Max)
+    {
+        commands[i] = token;
+        token = strtok_r(NULL, "|", &saveptr);
+        i++;
+    }
+    commands[i] = NULL;
+    int num_cmds = i;
+
+    int fds[num_cmds - 1][2];
+
+    for (i = 0; i < num_cmds - 1; i++)
+    {
+        pipe(fds[i]);
+    }
+
+    for (i = 0; i < num_cmds; i++)
+    {
+        int pd = fork();
+        if (pd == 0)
+        {
+            if (i != 0)
+            {
+                dup2(fds[i - 1][0], STDIN_FILENO);
+                close(fds[i - 1][0]);
+            }
+            if (i != num_cmds - 1)
+            {
+                dup2(fds[i][1], STDOUT_FILENO);
+                close(fds[i][1]);
+            }
+            for (int j = 0; j < num_cmds - 1; j++)
+            {
+                close(fds[j][0]);
+                close(fds[j][1]);
+            }
+
+            char *cmd = trim(commands[i]);
+            char *redirect_output = strstr(cmd, ">");
+            char *redirect_append = strstr(cmd, ">>");
+            char *redirect_input = strstr(cmd, "<");
+
+            if (redirect_output != NULL)
+            {
+                char *cmd_part = strtok(cmd, ">");
+                char *output_file = strtok(NULL, ">");
+                output_file = trim(output_file);
+                int fd = open(output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+                if (fd == -1)
+                {
+                    perror("open failed");
+                    exit(1);
+                }
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                cmd = trim(cmd_part);
+            }
+            else if (redirect_append != NULL)
+            {
+                char *cmd_part = strtok(cmd, ">>");
+                char *output_file = strtok(NULL, ">>");
+                output_file = trim(output_file);
+                int fd = open(output_file, O_CREAT | O_WRONLY | O_APPEND, 0644);
+                if (fd == -1)
+                {
+                    perror("open failed");
+                    exit(1);
+                }
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                cmd = trim(cmd_part);
+            }
+            else if (redirect_input != NULL)
+            {
+                char *cmd_part = strtok(cmd, "<");
+                char *input_file = strtok(NULL, "<");
+                input_file = trim(input_file);
+                int fd = open(input_file, O_RDONLY);
+                if (fd == -1)
+                {
+                    perror("open failed");
+                    exit(1);
+                }
+                dup2(fd, STDIN_FILENO);
+                close(fd);
+                cmd = trim(cmd_part);
+            }
+
+            char *arg[Max];
+            readltok(cmd, arg);
+            execvp(arg[0], arg);
+            perror("execvp failed");
+            exit(1);
+        }
+        else if (pd < 0)
+        {
+            perror("fork failed");
+            exit(1);
+        }
+    }
+
+    for (i = 0; i < num_cmds - 1; i++)
+    {
+        close(fds[i][0]);
+        close(fds[i][1]);
+    }
+
+    for (i = 0; i < num_cmds; i++)
+    {
+        wait(NULL);
+    }
+}
+
+char *rtrim(char *str)
+{
+    if (str == NULL || *str == '\0')
+    {
+        return str;
+    }
+
+    int len = strlen(str);
+    char *p = str + len - 1;
+    while (p >= str && isspace(*p))
+    {
+        *p = '\0';
+        --p;
+    }
+    return str;
+}
+char *ltrim(char *str)
+{
+    if (str == NULL || *str == '\0')
+    {
+        return str;
+    }
+
+    int len = 0;
+    char *p = str;
+    while (*p != '\0' && isspace(*p))
+    {
+        ++p;
+        ++len;
+    }
+
+    memmove(str, p, strlen(str) - len + 1);
+
+    return str;
+}
+// 去除首尾空格
+char *trim(char *str)
+{
+    str = rtrim(str);
+    str = ltrim(str);
+
+    return str;
 }
