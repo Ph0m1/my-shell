@@ -22,28 +22,29 @@
 #define RED "\033[1;32;31m"
 #define NONE "\033[0m"
 
-int cin = 0;
-char *formatPath;
+// int cin = 0;
+char formatPath[Max];
+int pass = 0;
 
 void showhistory();
 // 获取用户组信息
 void getid(char *str);
 // 屏蔽信号
 void getit();
-// 输出
-void colorfulprint();
+
 // cd
 void mycd(char *argv[]);
 
-void exec(char *arg[]);
+// void exec(char *arg[]);
 
-int readltok(char *stdinn, char *argv[]);
+void readltok(char *stdinn, char *argv[]);
 void truedir(char *path);
 
 void prosses(char *command);
 char *trim(char *str);
 char *rtrim(char *str);
 char *ltrim(char *str);
+void cancelchar(char *command,char n);
 int main(int argc, char *argv[])
 {
     getit();
@@ -68,23 +69,71 @@ int main(int argc, char *argv[])
         char *command;
 
         int cnt = 0;
+        
+        if (strstr(stdinn, "&") != NULL)
+        {
+            cancelchar(stdinn,'&');
+            pass = 1;
+        }
         command = strdup(stdinn);
-
-        arg[0] = strtok(stdinn, " ");
+        readltok(stdinn, arg);
         if (arg[0] == NULL)
             continue;
-        if (strcmp(arg[0], "cd") == 0 || strcmp(arg[0], "chdir") == 0)
-            mycd(arg);
+        if (pass == 0)
+        {
+            if (strcmp(arg[0], "cd") == 0 || strcmp(arg[0], "chdir") == 0)
+            {
+                mycd(arg);
+            }
+            else
+            {
+                prosses(command);
+            }
+        }
         else
-            prosses(command);
+        {
+            int pid;
+            pid = fork();
+            if (pid == -1)
+            {
+                perror("fork");
+                exit;
+            }
+            else if (pid == 0)
+            {
+                if (strcmp(arg[0], "cd") == 0 || strcmp(arg[0], "chdir") == 0)
+                {
+                    mycd(arg);
+                }
+                else
+                {
+                    prosses(command);
+                }
+                exit(0);
+            }
+            else {
+                int stat;
+                if(waitpid(0,&stat,0))
+                printf("[1] %d\t%s\n",stat,command);
+            }
+        }
+        for (int i = 0; arg[i] != NULL; i++)
+            free(arg[i]);
         free(stdinn);
         free(command);
         fflush(stdout);
     }
+    // free(formatPath);
     free(stdinn);
     free(readlineonscreen);
 }
-
+void cancelchar(char*command, char n)
+ {
+ 	char *p;
+ 	for(p = command; *p != '\0'; p++)
+ 		if(*p != n) *command++ = *p;
+ 	*command = '\0';	
+ }
 void mycd(char *arg[])
 {
     char *path;
@@ -108,7 +157,8 @@ void mycd(char *arg[])
     {
         chdir(arg[1]);
     }
-    formatPath = strdup(path);
+    strcpy(formatPath, path);
+    // formatPath = strdup(path);
     free(path);
 }
 
@@ -143,11 +193,11 @@ void getid(char *str)
     fflush(stdout);
 }
 
-int readltok(char *stdinn, char *argv[])
+void readltok(char *stdinn, char *argv[])
 {
     char *tok = strtok(stdinn, " \n");
     if (tok == NULL)
-        return 0;
+        return;
     int i = 0;
 
     while (tok != NULL && i < Max)
@@ -158,8 +208,6 @@ int readltok(char *stdinn, char *argv[])
         i++;
     }
     argv[i] = NULL;
-    cin = i + 1;
-    return cin;
 }
 
 void truedir(char *path)
@@ -178,27 +226,6 @@ void getit()
 {
     signal(SIGINT, SIG_IGN);
     signal(SIGHUP, SIG_IGN);
-}
-
-void exec(char *arg[])
-{
-    int pd = fork();
-    if (pd == 0)
-    {
-        if (execvp(arg[0], arg) < 0)
-        {
-            perror("command not found");
-            exit(1);
-        }
-    }
-    else if (pd < 0)
-    {
-        perror("fork failed");
-        exit(1);
-    }
-    else
-        wait(&pd);
-    return;
 }
 
 void prosses(char *command)
@@ -315,7 +342,6 @@ void prosses(char *command)
         close(fds[i][0]);
         close(fds[i][1]);
     }
-
     for (i = 0; i < num_cmds; i++)
     {
         wait(NULL);
