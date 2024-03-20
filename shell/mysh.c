@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
             pass = 1;
         }
         command = strdup(stdinn);
-        // command[strcspn(command, "\n")] = 0;
+        command[strcspn(command, "\n")] = 0;
         readltok(stdinn, arg);
         if (arg[0] == NULL)
             continue;
@@ -116,19 +116,21 @@ int main(int argc, char *argv[])
             }
             else if (pid > 0 && pass == 1)
             {
-                printf("[1] %d\t%s\n", pid, command);
+                
                 int stat;
+                usleep(10000);
                 waitpid(pid,&stat,WNOHANG);
-
+                printf("[1] %d\t%s\n", pid, command);
                 
             }
+            
         }
         for (int i = 0; arg[i] != NULL; i++)
             free(arg[i]);
         free(stdinn);
+        free(command);
         fflush(stdout);
     }
-    // free(formatPath);
     free(stdinn);
     free(readlineonscreen);
 }
@@ -344,7 +346,7 @@ void prosses(char *command)
             exit(1);
         }
         
-    free(command);
+    // free(command);
     }
 
     for (i = 0; i < num_cmds - 1; i++)
