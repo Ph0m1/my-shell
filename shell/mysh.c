@@ -24,7 +24,7 @@
 
 // int cin = 0;
 char formatPath[Max];
-int pass = 0;
+int pass =0;
 
 void showhistory();
 // 获取用户组信息
@@ -44,7 +44,7 @@ void prosses(char *command);
 char *trim(char *str);
 char *rtrim(char *str);
 char *ltrim(char *str);
-void cancelchar(char *command,char n);
+void cancelchar(char *command, char n);
 int main(int argc, char *argv[])
 {
     getit();
@@ -69,13 +69,14 @@ int main(int argc, char *argv[])
         char *command;
 
         int cnt = 0;
-        
+        pass = 0;
         if (strstr(stdinn, "&") != NULL)
         {
-            cancelchar(stdinn,'&');
+            cancelchar(stdinn, '&');
             pass = 1;
         }
         command = strdup(stdinn);
+        // command[strcspn(command, "\n")] = 0;
         readltok(stdinn, arg);
         if (arg[0] == NULL)
             continue;
@@ -86,7 +87,7 @@ int main(int argc, char *argv[])
                 mycd(arg);
             }
             else
-            {
+            {   
                 prosses(command);
             }
         }
@@ -108,32 +109,37 @@ int main(int argc, char *argv[])
                 else
                 {
                     prosses(command);
+                    for (int i = 0; arg[i] != NULL; i++)
+                        free(arg[i]);
                 }
                 exit(0);
             }
-            else {
+            else if (pid > 0 && pass == 1)
+            {
+                printf("[1] %d\t%s\n", pid, command);
                 int stat;
-                if(waitpid(0,&stat,0))
-                printf("[1] %d\t%s\n",stat,command);
+                waitpid(pid,&stat,WNOHANG);
+
+                
             }
         }
         for (int i = 0; arg[i] != NULL; i++)
             free(arg[i]);
         free(stdinn);
-        free(command);
         fflush(stdout);
     }
     // free(formatPath);
     free(stdinn);
     free(readlineonscreen);
 }
-void cancelchar(char*command, char n)
- {
- 	char *p;
- 	for(p = command; *p != '\0'; p++)
- 		if(*p != n) *command++ = *p;
- 	*command = '\0';	
- }
+void cancelchar(char *command, char n)
+{
+    char *p;
+    for (p = command; *p != '\0'; p++)
+        if (*p != n)
+            *command++ = *p;
+    *command = '\0';
+}
 void mycd(char *arg[])
 {
     char *path;
@@ -328,13 +334,17 @@ void prosses(char *command)
             readltok(cmd, arg);
             execvp(arg[0], arg);
             perror("execvp failed");
+            free(command);
             exit(1);
         }
         else if (pd < 0)
         {
             perror("fork failed");
+            free(command);
             exit(1);
         }
+        
+    free(command);
     }
 
     for (i = 0; i < num_cmds - 1; i++)
