@@ -146,7 +146,7 @@ void mycd(char *arg[])
 {
     char *path;
     path = getcwd(NULL, 0);
-    if (strcmp(arg[1], "~") == 0)
+    if (arg[1] == NULL || strcmp(arg[1], "~") == 0)
     {
         char *home = getenv("HOME");
         chdir(home);
@@ -163,7 +163,9 @@ void mycd(char *arg[])
     }
     else
     {
-        chdir(arg[1]);
+        if(chdir(arg[1]) == -1 ){
+            printf("不存在的目录: %s",arg[1]);
+        }
     }
     strcpy(formatPath, path);
     // formatPath = strdup(path);
